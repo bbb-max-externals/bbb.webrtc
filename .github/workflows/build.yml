@@ -91,9 +91,9 @@ jobs:
         shell: cmd
         run: |
           git clone https://github.com/openssl/openssl.git --branch openssl-3.3.2 --depth 1 C:\openssl-src
-          cd C:\openssl-src
+          cd /d C:\openssl-src
           perl Configure VC-WIN64A no-shared no-tests --prefix=C:\openssl
-          :: Match /MT (static CRT) used by min-api and our CMake config
+          REM Match /MT (static CRT) used by min-api and our CMake config
           powershell -Command "(Get-Content makefile -Raw).Replace('/MDd','/MTd').Replace('/MD ','/MT ') | Set-Content makefile -NoNewline"
           nmake
           nmake install_sw
