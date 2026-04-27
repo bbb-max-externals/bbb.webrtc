@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Max/MSP external objects for WebRTC-based audio send and receive.
+Max/MSP external objects for WebRTC-based audio and video send/receive.
 
 ## Externals
 
@@ -50,6 +50,41 @@ Outputs formatted ICE server config that can be routed to send/recv objects.
 
 - Messages: `bang` (output config), `defaults` (reset), `dump`
 
+### bbb.webrtc.send.video — Jitter Video Sender
+
+Jitter MOP object. Captures RGBA matrix frames, H.264-encodes (hardware), sends via WebRTC.
+
+```
+[jit.matrix] → [bbb.webrtc.send.video @width 640 @height 480 @bitrate 2000000 @fps 30]
+                               |
+                               | offer <sdp>
+                               | candidate <c> <mid>
+                               | state connected
+```
+
+- Same STUN/TURN attributes as audio send.
+- `@width` — Video width (default: 640, range: 16–3840)
+- `@height` — Video height (default: 480, range: 16–2160)
+- `@bitrate` — H.264 bitrate in bps (default: 2000000, range: 100000–10000000)
+- `@fps` — Frame rate (default: 30, range: 1–60)
+- Messages: `offer`, `answer <sdp>`, `candidate <c> <mid>`, `close`, `dump`
+- Uses `matrix_operator<>` (Jitter MOP). Captures frame at `calc_cell(0,0)`.
+
+### bbb.webrtc.recv.video — Jitter Video Receiver
+
+Jitter MOP object. Receives WebRTC video, H.264-decodes (hardware), outputs RGBA matrix.
+
+```
+[bbb.webrtc.recv.video @stun_server stun:stun.l.google.com:19302]
+    |                                    |
+    | [matrix out]                       | answer <sdp>
+    |                                    | candidate <c> <mid>
+```
+
+- Same STUN/TURN attributes.
+- Messages: `offer <sdp>`, `candidate <c> <mid>`, `close`, `dump`
+- Generator-mode `matrix_operator<>`. Writes decoded RGBA in `calc_cell` (plane_count == 4).
+
 ## Architecture
 
 ```
@@ -61,21 +96,40 @@ bbb.webrtc/
 ├── deps/
 │   └── min-api/                # git submodule (max-sdk-base inside)
 ├── source/
-│   ├── webrtc/                 # Shared static library
+│   ├── webrtc/                 # Shared static libraries
 │   │   ├── include/bbb/
 │   │   │   ├── webrtc_session.hpp
 │   │   │   ├── opus_codec.hpp
-│   │   │   └── audio_ring_buffer.hpp
+│   │   │   ├── audio_ring_buffer.hpp
+│   │   │   ├── video_session.hpp
+│   │   │   ├── video_encoder.hpp
+│   │   │   ├── video_decoder.hpp
+│   │   │   └── color_convert.hpp
 │   │   └── src/
+│   │       ├── webrtc_session.cpp    (bbb_webrtc)
+│   │       ├── opus_codec.cpp        (bbb_webrtc)
+│   │       ├── audio_ring_buffer.cpp (bbb_webrtc)
+│   │       ├── video_session.cpp     (bbb_webrtc_video)
+│   │       ├── color_convert.cpp     (bbb_webrtc_video)
+│   │       ├── video_encoder_videotoolbox.mm  (macOS)
+│   │       ├── video_decoder_videotoolbox.mm  (macOS)
+│   │       ├── video_encoder_mf.cpp           (Windows)
+│   │       └── video_decoder_mf.cpp           (Windows)
 │   ├── projects/
-│   │   ├── bbb.webrtc.send/
-│   │   ├── bbb.webrtc.recv/
-│   │   └── bbb.webrtc.cfg/
+│   │   ├── bbb.webrtc.send/     (links bbb_webrtc)
+│   │   ├── bbb.webrtc.recv/     (links bbb_webrtc)
+│   │   ├── bbb.webrtc.cfg/      (links bbb_webrtc)
+│   │   ├── bbb.webrtc.send.video/ (links bbb_webrtc_video)
+│   │   └── bbb.webrtc.recv.video/ (links bbb_webrtc_video)
 │   └── bbb/version.h           # Auto-generated
 ├── externals/                  # Build output (.mxo)
 ├── help/
 └── package-info.json
 ```
+
+Two static libraries:
+- `bbb_webrtc` — Audio core (session, opus, ring buffer). Linked by all externals.
+- `bbb_webrtc_video` — Video extension (encoder, decoder, color convert, video session). Links `bbb_webrtc` + platform video frameworks. Linked only by video externals.
 
 Naming convention: directory = `bbb.webrtc.send`, C++ class = `bbb_webrtc_send`, MIN_EXTERNAL arg = `bbb_webrtc_send`.
 
@@ -135,6 +189,10 @@ Typical flow:
 8. **`vector_operator<>` takes no template args** — Not `vector_operator<MyClass>`.
 9. **`rtc::binary` is `std::vector<std::byte>`** — Cast from/to `uint8_t` explicitly.
 10. **`project()` required in subdirectory CMakeLists.txt** — Without it, `bbb_add_external()` uses the root project name for all targets.
+11. **`calc_cell` template instantiates for multiple plane_counts** — Use `if constexpr (plane_count == 4)` for RGBA handling.
+12. **MF `ProcessMessage` takes `ULONG_PTR`** — Use `0`, not `nullptr`, on Windows.
+13. **MF has no `GetOutputType`** — Use `GetOutputAvailableType(stream, index, &type)`.
+14. **`matrix_info::m_bip` is raw RGBA pointer** — Access directly for frame capture in send.video.
 
 ## CI
 
@@ -151,10 +209,12 @@ GitHub Actions workflow at `.github/workflows/build.yml`:
 
 ## Help Files
 
-Each external has a `.maxhelp` patch in its project directory:
-- `source/projects/bbb.webrtc.send/bbb.webrtc.send.maxhelp`
-- `source/projects/bbb.webrtc.recv/bbb.webrtc.recv.maxhelp`
-- `source/projects/bbb.webrtc.cfg/bbb.webrtc.cfg.maxhelp`
+Help patches are in the `help/` directory:
+- `help/bbb.webrtc.send.maxhelp`
+- `help/bbb.webrtc.recv.maxhelp`
+- `help/bbb.webrtc.cfg.maxhelp`
+- `help/bbb.webrtc.send.video.maxhelp`
+- `help/bbb.webrtc.recv.video.maxhelp`
 
 A loopback test patch is at `help/bbb.webrtc-test.maxpat`.
 

@@ -1,6 +1,6 @@
 # bbb.webrtc
 
-Max/MSP externals for sending and receiving audio via WebRTC.
+Max/MSP externals for sending and receiving audio and video via WebRTC.
 
 ## Objects
 
@@ -44,6 +44,44 @@ Same STUN/TURN attributes as send.
 ICE configuration helper. Outputs STUN/TURN settings that can be routed to send/recv objects.
 
 **Messages:** `bang` (output config), `defaults` (reset), `dump`
+
+### bbb.webrtc.send.video
+
+Jitter MOP object. Captures RGBA matrix frames, H.264-encodes (hardware), and sends via WebRTC.
+
+```
+[jit.noise 640 480 4] → [bbb.webrtc.send.video @width 640 @height 480 @bitrate 2000000]
+                                   |
+                                   | offer <sdp>
+                                   | candidate <c> <mid>
+                                   | state connected
+```
+
+**Attributes:**
+- `@stun_server` — STUN server URL (default: `stun:stun.l.google.com:19302`)
+- `@turn_server` — TURN server URL
+- `@turn_username` / `@turn_password` — TURN credentials
+- `@bitrate` — H.264 bitrate in bps (default: 2000000, range: 100000–10000000)
+- `@width` — Video width (default: 640, range: 16–3840)
+- `@height` — Video height (default: 480, range: 16–2160)
+- `@fps` — Frame rate (default: 30, range: 1–60)
+
+**Messages:** `offer`, `answer <sdp>`, `candidate <c> <mid>`, `close`, `dump`
+
+### bbb.webrtc.recv.video
+
+Jitter MOP object. Receives WebRTC video, H.264-decodes (hardware), and outputs RGBA matrix.
+
+```
+[bbb.webrtc.recv.video @stun_server stun:stun.l.google.com:19302]
+    |                                    |
+    | [matrix out → jit.window]          | answer <sdp>
+    |                                    | candidate <c> <mid>
+```
+
+Same STUN/TURN attributes as send.video.
+
+**Messages:** `offer <sdp>`, `candidate <c> <mid>`, `close`, `dump`
 
 ## Signaling
 
