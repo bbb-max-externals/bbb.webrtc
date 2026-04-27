@@ -98,3 +98,11 @@ GitHub Actions builds both platforms on every push to `main`:
 ## License
 
 MIT
+
+### Third-Party Licenses
+
+| Library | License | Copyright |
+|---------|---------|-----------|
+| [min-api](https://github.com/Cycling74/min-api) (max-sdk-base) | MIT | © Cycling '74 |
+| [libdatachannel](https://github.com/paullouisageneau/libdatachannel) v0.22.6 | MPL 2.0 | © Paul-Louis Ageneau |
+| [libopus](https://opus-codec.org/) v1.5.2 | BSD 3-Clause | © Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin, Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding, Erik de Castro Lopo, Mozilla, Amazon |
