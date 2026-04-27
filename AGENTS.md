@@ -217,6 +217,7 @@ Help patches are in the `help/` directory:
 - `help/bbb.webrtc.recv.video.maxhelp`
 
 A loopback test patch is at `help/bbb.webrtc-test.maxpat`.
+A video loopback test patch is at `help/bbb.webrtc-video-test.maxpat`.
 
 ## Platform Support
 
