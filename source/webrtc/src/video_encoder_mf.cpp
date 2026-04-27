@@ -485,7 +485,7 @@ bool mf_video_encoder::encode(const uint8_t *rgba_data, int stride,
 			if(SUCCEEDED(hr)) {
 				encoded_frame frame;
 				frame.timestamp_us = timestamp_us;
-				frame.is_keyframe = is_keyframe(output_buffer.pSample.Get());
+				frame.is_keyframe = is_keyframe(output_buffer.pSample);
 
 				if(frame.is_keyframe && !sps_pps_.empty()) {
 					frame.data.insert(frame.data.end(),
