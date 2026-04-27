@@ -14,7 +14,7 @@ static std::string to_string(const symbol &s) {
 	return std::string(s.c_str());
 }
 
-class bbb_webrtc_send : public object<bbb_webrtc_send>, public vector_operator<bbb_webrtc_send> {
+class bbb_webrtc_send : public object<bbb_webrtc_send>, public vector_operator<> {
 public:
 	MIN_DESCRIPTION{"Send audio via WebRTC"};
 	MIN_TAGS{"webrtc, audio, network"};
@@ -100,12 +100,12 @@ public:
 		if(!m_session) return;
 
 		for(int i = 0; i < frame_count; ++i) {
-			float sample = 0.0f;
+			double sample = 0.0;
 			for(int ch = 0; ch < channel_count; ++ch) {
-				sample += input[ch][i];
+				sample += input.samples(ch)[i];
 			}
 			sample /= channel_count;
-			m_encode_buffer.push_back(sample);
+			m_encode_buffer.push_back(static_cast<float>(sample));
 
 			if(static_cast<int>(m_encode_buffer.size()) >= m_frame_size) {
 				m_session->send_audio(m_encode_buffer.data(), m_frame_size, 1);

@@ -36,24 +36,20 @@ session::~session() {
 void session::setup_peer_connection() {
 	rtc::Configuration rtc_config;
 	for(const auto &srv : config_.ice_servers) {
-		rtc::IceServer ice_srv;
-		ice_srv.urls.push_back(srv.url);
-		ice_srv.username = srv.username;
-		ice_srv.password = srv.password;
-		rtc_config.iceServers.push_back(ice_srv);
+		rtc_config.iceServers.push_back(rtc::IceServer(srv.url));
 	}
 
 	pc_ = std::make_shared<rtc::PeerConnection>(rtc_config);
 
-	pc_->onStateChange([this](rtc::PeerConnection::State state) {
-		state s = state::disconnected;
-		switch(state) {
-			case rtc::PeerConnection::State::New: s = state::disconnected; break;
-			case rtc::PeerConnection::State::Connecting: s = state::connecting; break;
-			case rtc::PeerConnection::State::Connected: s = state::connected; break;
-			case rtc::PeerConnection::State::Disconnected: s = state::disconnected; break;
-			case rtc::PeerConnection::State::Failed: s = state::failed; break;
-			case rtc::PeerConnection::State::Closed: s = state::closed; break;
+	pc_->onStateChange([this](rtc::PeerConnection::State pc_state) {
+		session::state s = session::state::disconnected;
+		switch(pc_state) {
+			case rtc::PeerConnection::State::New: s = session::state::disconnected; break;
+			case rtc::PeerConnection::State::Connecting: s = session::state::connecting; break;
+			case rtc::PeerConnection::State::Connected: s = session::state::connected; break;
+			case rtc::PeerConnection::State::Disconnected: s = session::state::disconnected; break;
+			case rtc::PeerConnection::State::Failed: s = session::state::failed; break;
+			case rtc::PeerConnection::State::Closed: s = session::state::closed; break;
 		}
 		{
 			std::lock_guard<std::mutex> lock(mutex_);
@@ -103,18 +99,23 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 	auto depacketizer = std::make_shared<rtc::OpusRtpDepacketizer>();
 	track->setMediaHandler(depacketizer);
 
-	track->onMessage([this](rtc::variant<rtc::binary, rtc::string> data) {
+	track->onMessage([this](rtc::message_variant data) {
 		if(!std::holds_alternative<rtc::binary>(data)) return;
 
-		const auto &binary = std::get<rtc::binary>(data);
-		if(binary.empty()) return;
+		const auto &bin = std::get<rtc::binary>(data);
+		if(bin.empty()) return;
 
 		const int max_frames = config_.opus_frame_size;
 		std::vector<float> pcm(max_frames * config_.opus_channels);
 
+		std::vector<std::uint8_t> raw_bytes(bin.size());
+		for(std::size_t i = 0; i < bin.size(); ++i) {
+			raw_bytes[i] = static_cast<std::uint8_t>(bin[i]);
+		}
+
 		int decoded = decoder_->dec.decode(
-			reinterpret_cast<const std::uint8_t *>(binary.data()),
-			static_cast<int>(binary.size()),
+			raw_bytes.data(),
+			static_cast<int>(raw_bytes.size()),
 			pcm.data(),
 			max_frames
 		);
@@ -162,7 +163,10 @@ void session::send_audio(const float *samples, int frame_count, int channels) {
 
 	int encoded = encoder_->enc.encode(samples, frame_count, output.data(), max_output);
 	if(encoded > 0) {
-		rtc::binary data(output.begin(), output.begin() + encoded);
+		rtc::binary data(encoded);
+		for(int i = 0; i < encoded; ++i) {
+			data[i] = static_cast<std::byte>(output[i]);
+		}
 		audio_track_->send(data);
 	}
 }
@@ -202,7 +206,7 @@ void session::close() {
 		pc_->close();
 		pc_.reset();
 	}
-	state_ = state::closed;
+	state_ = session::state::closed;
 }
 
 }

@@ -14,7 +14,7 @@ static std::string to_string(const symbol &s) {
 	return std::string(s.c_str());
 }
 
-class bbb_webrtc_recv : public object<bbb_webrtc_recv>, public vector_operator<bbb_webrtc_recv> {
+class bbb_webrtc_recv : public object<bbb_webrtc_recv>, public vector_operator<> {
 public:
 	MIN_DESCRIPTION{"Receive audio via WebRTC"};
 	MIN_TAGS{"webrtc, audio, network"};
@@ -83,10 +83,11 @@ public:
 
 	void operator()(audio_bundle input, audio_bundle output) {
 		auto frame_count = static_cast<int>(output.frame_count());
+		auto *out = output.samples(0);
 
 		if(!m_connected.load()) {
 			for(int i = 0; i < frame_count; ++i) {
-				output[0][i] = 0.0f;
+				out[i] = 0.0;
 			}
 			return;
 		}
@@ -96,9 +97,9 @@ public:
 
 		for(int i = 0; i < frame_count; ++i) {
 			if(i < static_cast<int>(read)) {
-				output[0][i] = read_buf[i];
+				out[i] = static_cast<double>(read_buf[i]);
 			} else {
-				output[0][i] = 0.0f;
+				out[i] = 0.0;
 			}
 		}
 	}

@@ -70,24 +70,24 @@ private:
 	void output_config() {
 		atoms stun_args;
 		stun_args.push_back(atom(symbol("stun_server")));
-		stun_args.push_back(atom(stun_server));
+		stun_args.push_back(atom(symbol(stun_server.get())));
 		output.send(stun_args);
 
 		auto turn = to_string(turn_server);
 		if(!turn.empty()) {
 			atoms turn_args;
 			turn_args.push_back(atom(symbol("turn_server")));
-			turn_args.push_back(atom(turn_server));
+			turn_args.push_back(atom(symbol(turn_server.get())));
 			output.send(turn_args);
 
 			atoms user_args;
 			user_args.push_back(atom(symbol("turn_username")));
-			user_args.push_back(atom(turn_username));
+			user_args.push_back(atom(symbol(turn_username.get())));
 			output.send(user_args);
 
 			atoms pass_args;
 			pass_args.push_back(atom(symbol("turn_password")));
-			pass_args.push_back(atom(turn_password));
+			pass_args.push_back(atom(symbol(turn_password.get())));
 			output.send(pass_args);
 		}
 	}
