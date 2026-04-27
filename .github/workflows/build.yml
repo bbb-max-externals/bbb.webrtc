@@ -14,10 +14,54 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache OpenSSL (Universal Binary)
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: /tmp/openssl-universal
+          key: openssl-3.3.2-universal-macos-v1
+
+      - name: Build OpenSSL (Universal Binary)
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/openssl/openssl.git --branch openssl-3.3.2 --depth 1 /tmp/openssl-src
+          cd /tmp/openssl-src
+
+          # Build for arm64
+          ./Configure darwin64-arm64-cc no-shared no-tests --prefix=/tmp/ssl-arm64
+          make -j$(sysctl -n hw.logicalcpu) && make install_sw && make clean
+
+          # Build for x86_64 (cross-compile)
+          ./Configure darwin64-x86_64-cc no-shared no-tests --prefix=/tmp/ssl-x86_64
+          make -j$(sysctl -n hw.logicalcpu) && make install_sw
+
+          # Create universal static libraries
+          mkdir -p /tmp/openssl-universal/lib /tmp/openssl-universal/include
+          cp -r /tmp/ssl-arm64/include/openssl /tmp/openssl-universal/include/
+          lipo -create \
+            /tmp/ssl-arm64/lib/libssl.a \
+            /tmp/ssl-x86_64/lib/libssl.a \
+            -output /tmp/openssl-universal/lib/libssl.a
+          lipo -create \
+            /tmp/ssl-arm64/lib/libcrypto.a \
+            /tmp/ssl-x86_64/lib/libcrypto.a \
+            -output /tmp/openssl-universal/lib/libcrypto.a
+
       - name: Configure and Build
         run: |
-          cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake -B build \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DOPENSSL_ROOT_DIR=/tmp/openssl-universal \
+            -DOPENSSL_USE_STATIC_LIBS=ON
           cmake --build build --config Release
+
+      - name: Verify Universal Binary
+        run: |
+          for f in externals/*.mxo/Contents/MacOS/*; do
+            echo "=== $f ==="
+            lipo -info "$f"
+          done
 
       - name: Upload externals
         uses: actions/upload-artifact@v4
@@ -32,9 +76,35 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Configure and Build
+      - name: Setup MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache OpenSSL (x64)
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: C:\openssl
+          key: openssl-3.3.2-x64-windows-v1
+
+      - name: Build OpenSSL (x64)
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        shell: cmd
         run: |
-          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          git clone https://github.com/openssl/openssl.git --branch openssl-3.3.2 --depth 1 C:\openssl-src
+          cd C:\openssl-src
+          perl Configure VC-WIN64A no-shared no-tests --prefix=C:\openssl
+          :: Match /MT (static CRT) used by min-api and our CMake config
+          powershell -Command "(Get-Content makefile -Raw).Replace('/MDd','/MTd').Replace('/MD ','/MT ') | Set-Content makefile -NoNewline"
+          nmake
+          nmake install_sw
+
+      - name: Configure and Build
+        shell: pwsh
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
+            -DOPENSSL_ROOT_DIR=C:\openssl `
+            -DOPENSSL_USE_STATIC_LIBS=ON
           cmake --build build --config Release
 
       - name: Upload externals

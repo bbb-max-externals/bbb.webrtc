@@ -103,7 +103,7 @@ For arm64 only (Apple Silicon):
 cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_OSX_ARCHITECTURES=arm64
 ```
 
-Universal Binary (x86_64 + arm64) requires OpenSSL for both architectures. Default is arm64 on Apple Silicon.
+Universal Binary (x86_64 + arm64) requires OpenSSL built for both architectures. CI builds OpenSSL from source and creates universal static libraries.
 
 Adding a new external: create directory under `source/projects/`, add `project(bbb.webrtc.xxx)` then `bbb_add_external()` in its CMakeLists.txt, add `.mxo` entry to `package-info.json` filelist. Root CMake auto-discovers subdirectories.
 
@@ -139,9 +139,15 @@ Typical flow:
 ## CI
 
 GitHub Actions workflow at `.github/workflows/build.yml`:
-- **macOS** (`macos-latest`): arm64 build, uploads `.mxo` artifacts
-- **Windows** (`windows-latest`): x64 build via Visual Studio 2022, uploads `.mxe64` artifacts
-- Both use `CMAKE_POLICY_VERSION_MINIMUM=3.5` and `submodules: recursive`
+- **macOS** (`macos-latest`): Universal Binary (x86_64 + arm64)
+  - Builds OpenSSL 3.3.2 from source for both architectures
+  - Creates universal static libraries via `lipo`
+  - Caches OpenSSL build for subsequent runs
+  - Verifies `.mxo` is universal with `lipo -info`
+- **Windows** (`windows-latest`): x64 build via Visual Studio 2022
+  - Builds OpenSSL 3.3.2 from source with `/MT` (static CRT)
+  - Caches OpenSSL build for subsequent runs
+- Both use `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `OPENSSL_USE_STATIC_LIBS=ON`, and `submodules: recursive`
 
 ## Help Files
 
@@ -154,5 +160,5 @@ A loopback test patch is at `help/bbb.webrtc-test.maxpat`.
 
 ## Platform Support
 
-- **macOS**: arm64 (tested), x86_64 + arm64 universal binary needs multi-arch OpenSSL.
-- **Windows**: `.mxe64` supported via `package-info.json`. Requires Visual Studio 2022 + CMake. libdatachannel and opus build on Windows via FetchContent. Build command: `cmake -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Release`.
+- **macOS**: arm64 (tested). Universal Binary (x86_64 + arm64) via CI — builds OpenSSL from source for both archs, `lipo` creates universal static libs.
+- **Windows**: `.mxe64` supported via `package-info.json`. Requires Visual Studio 2022 + CMake. OpenSSL built from source with `/MT` to match min-api CRT. Build command: `cmake -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Release`.
