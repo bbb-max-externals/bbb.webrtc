@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(bbb.webrtc)
+project(bbb.webrtc VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,11 +9,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/bbb_external.cmake)
 
 # --- output directory ---
 set(C74_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/externals)
-
-# --- universal binary (macOS) ---
-if(APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
-	set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "macOS architecture" FORCE)
-endif()
 
 # --- libdatachannel (WebRTC with media support) ---
 include(FetchContent)
