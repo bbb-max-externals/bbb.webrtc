@@ -60,6 +60,7 @@ elseif(WIN32)
 	target_link_libraries(bbb_webrtc_video PUBLIC
 		mfplat
 		mf
+		mfuuid
 		uuid
 		strmiids
 	)
