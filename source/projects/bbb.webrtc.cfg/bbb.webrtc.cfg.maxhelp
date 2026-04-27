@@ -1,0 +1,53 @@
+{
+	"patcher" : {
+		"fileversion" : 1,
+		"appversion" : { "major" : 8, "minor" : 6, "revision" : 4 },
+		"classnamespace" : "box",
+		"rect" : [100, 100, 600, 500],
+		"bglocked" : 1,
+		"openrect" : [0, 0, 0, 0],
+		"openinpresentation" : 0,
+		"default_fontsize" : 12,
+		"default_fontface" : 0,
+		"default_fontname" : "Arial",
+		"gridonopen" : 2,
+		"gridsize" : [15, 15],
+		"gridsnaponopen" : 0,
+		"objectsnaponopen" : 1,
+		"statusbarvisible" : 2,
+		"toolbarvisible" : 2,
+		"lefttoolbarpinned" : 0,
+		"toptoolbarpinned" : 0,
+		"righttoolbarpinned" : 0,
+		"bottomtoolbarpinned" : 0,
+		"toolbars_unpinned_last_save" : 0,
+		"tallnewobj" : 0,
+		"boxanimatetime" : 200,
+		"enablehscroll" : 1,
+		"enablevscroll" : 1,
+		"devicewidth" : 0,
+		"description" : "WebRTC ICE configuration helper",
+		"digest" : "Outputs formatted STUN/TURN server configuration",
+		"tags" : "webrtc, config",
+		"style" : "",
+		"subpatcher_template" : "",
+		"assistshowspatchername" : 0,
+		"boxes" : [
+			{ "box" : { "id" : "obj-1", "maxclass" : "comment", "numinlets" : 0, "numoutlets" : 0, "patching_rect" : [50, 30, 300, 20], "text" : "bbb.webrtc.cfg — WebRTC ICE configuration helper" } },
+			{ "box" : { "id" : "obj-2", "maxclass" : "comment", "numinlets" : 0, "numoutlets" : 0, "patching_rect" : [50, 55, 400, 20], "text" : "Outputs STUN/TURN config that can be routed to send/recv objects" } },
+			{ "box" : { "id" : "obj-3", "maxclass" : "newobj", "numinlets" : 1, "numoutlets" : 1, "outlettype" : [ "" ], "patching_rect" : [50, 130, 350, 22], "text" : "bbb.webrtc.cfg @stun_server stun:stun.l.google.com:19302" } },
+			{ "box" : { "id" : "obj-4", "maxclass" : "newobj", "numinlets" : 1, "numoutlets" : 0, "patching_rect" : [50, 170, 100, 22], "text" : "print config" } },
+			{ "box" : { "id" : "obj-5", "maxclass" : "message", "numinlets" : 1, "numoutlets" : 1, "outlettype" : [ "" ], "patching_rect" : [50, 220, 50, 22], "text" : "bang" } },
+			{ "box" : { "id" : "obj-6", "maxclass" : "message", "numinlets" : 1, "numoutlets" : 1, "outlettype" : [ "" ], "patching_rect" : [120, 220, 80, 22], "text" : "defaults" } },
+			{ "box" : { "id" : "obj-7", "maxclass" : "message", "numinlets" : 1, "numoutlets" : 1, "outlettype" : [ "" ], "patching_rect" : [220, 220, 80, 22], "text" : "dump" } },
+			{ "box" : { "id" : "obj-8", "maxclass" : "comment", "numinlets" : 0, "numoutlets" : 0, "patching_rect" : [50, 270, 350, 20], "text" : "Attributes: @stun_server @turn_server @turn_username @turn_password" } },
+			{ "box" : { "id" : "obj-9", "maxclass" : "comment", "numinlets" : 0, "numoutlets" : 0, "patching_rect" : [50, 295, 400, 20], "text" : "bang outputs config as messages → route to bbb.webrtc.send/recv" } }
+		],
+		"lines" : [
+			{ "patchline" : { "source" : [ "obj-3", 0 ], "destination" : [ "obj-4", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-5", 0 ], "destination" : [ "obj-3", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-6", 0 ], "destination" : [ "obj-3", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-7", 0 ], "destination" : [ "obj-3", 0 ] } }
+		]
+	}
+}

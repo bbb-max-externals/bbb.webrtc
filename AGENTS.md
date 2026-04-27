@@ -136,6 +136,22 @@ Typical flow:
 9. **`rtc::binary` is `std::vector<std::byte>`** — Cast from/to `uint8_t` explicitly.
 10. **`project()` required in subdirectory CMakeLists.txt** — Without it, `bbb_add_external()` uses the root project name for all targets.
 
+## CI
+
+GitHub Actions workflow at `.github/workflows/build.yml`:
+- **macOS** (`macos-latest`): arm64 build, uploads `.mxo` artifacts
+- **Windows** (`windows-latest`): x64 build via Visual Studio 2022, uploads `.mxe64` artifacts
+- Both use `CMAKE_POLICY_VERSION_MINIMUM=3.5` and `submodules: recursive`
+
+## Help Files
+
+Each external has a `.maxhelp` patch in its project directory:
+- `source/projects/bbb.webrtc.send/bbb.webrtc.send.maxhelp`
+- `source/projects/bbb.webrtc.recv/bbb.webrtc.recv.maxhelp`
+- `source/projects/bbb.webrtc.cfg/bbb.webrtc.cfg.maxhelp`
+
+A loopback test patch is at `help/bbb.webrtc-test.maxpat`.
+
 ## Platform Support
 
 - **macOS**: arm64 (tested), x86_64 + arm64 universal binary needs multi-arch OpenSSL.
