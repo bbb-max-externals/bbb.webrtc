@@ -1,0 +1,12 @@
+[submodule ".agents/skills/max-external"]
+	path = .agents/skills/max-external
+	url = git@github.com:2bbb/max-external
+[submodule ".agents/skills/max-external-githubactions"]
+	path = .agents/skills/max-external-githubactions
+	url = git@github.com:2bbb/max-external-githubactions
+[submodule ".agents/skills/max-patgen"]
+	path = .agents/skills/max-patgen
+	url = git@github.com:2bbb/max-patgen.git
+[submodule "deps/min-api"]
+	path = deps/min-api
+	url = git@github.com:Cycling74/min-api.git

@@ -1,0 +1,36 @@
+{
+    "title": "bbb.webrtc",
+    "description": "WebRTC audio send/receive externals for Max/MSP",
+    "author": "ISHII 2bit",
+    "website": "https://github.com/2bbb/bbb.webrtc",
+    "extends": "",
+    "extensible": 0,
+    "homepatcher": "",
+    "max_version_min": "8.0",
+    "os": {
+        "macintosh": {
+            "externals": [
+                "externals/"
+            ],
+            "help": [
+                "help/"
+            ]
+        },
+        "windows": {
+            "externals": [
+                "externals/"
+            ],
+            "help": [
+                "help/"
+            ]
+        }
+    },
+    "filelist": {
+        "externals/bbb.webrtc.send.mxo": {},
+        "externals/bbb.webrtc.recv.mxo": {},
+        "externals/bbb.webrtc.cfg.mxo": {},
+        "externals/bbb.webrtc.send.mxe64": {},
+        "externals/bbb.webrtc.recv.mxe64": {},
+        "externals/bbb.webrtc.cfg.mxe64": {}
+    }
+}

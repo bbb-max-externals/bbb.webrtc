@@ -1,0 +1,8 @@
+build/
+externals/*.mxo/
+externals/*.mxe64/
+externals/*.dylib
+externals/*.dll
+.DS_Store
+*.swp
+*~
