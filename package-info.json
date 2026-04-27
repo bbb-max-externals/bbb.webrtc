@@ -29,8 +29,11 @@
         "externals/bbb.webrtc.send.mxo": {},
         "externals/bbb.webrtc.recv.mxo": {},
         "externals/bbb.webrtc.cfg.mxo": {},
+        "externals/bbb.webrtc.send.video.mxo": {},
+        "externals/bbb.webrtc.recv.video.mxo": {},
         "externals/bbb.webrtc.send.mxe64": {},
         "externals/bbb.webrtc.recv.mxe64": {},
-        "externals/bbb.webrtc.cfg.mxe64": {}
+        "externals/bbb.webrtc.send.video.mxe64": {},
+        "externals/bbb.webrtc.recv.video.mxe64": {}
     }
 }
