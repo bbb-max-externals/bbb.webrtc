@@ -263,7 +263,7 @@ bool mf_video_encoder::init(int width, int height, int bitrate_bps, int fps) {
 			hr = attributes->GetUINT32(MF_TRANSFORM_ASYNC, &is_async);
 			if(SUCCEEDED(hr) && is_async) {
 				hr = transform_->ProcessMessage(
-				    MFT_MESSAGE_NOTIFY_START_OF_STREAM, nullptr);
+				    MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
 				if(SUCCEEDED(hr)) {
 					async_mft_ = true;
 				}

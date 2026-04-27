@@ -253,7 +253,7 @@ bool mf_video_decoder::handle_stream_change() {
 	}
 
 	HRESULT hr = transform_->ProcessMessage(
-	    MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, nullptr);
+	    MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
 
 	return SUCCEEDED(hr) || hr == E_NOTIMPL;
 }
