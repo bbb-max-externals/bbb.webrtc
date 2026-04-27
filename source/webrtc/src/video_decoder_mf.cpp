@@ -136,7 +136,7 @@ private:
 
 mf_video_decoder::~mf_video_decoder() {
 	if(transform_) {
-		transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, nullptr);
+		transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0);
 	}
 	MFShutdown();
 }
@@ -155,7 +155,7 @@ bool mf_video_decoder::init() {
 		return false;
 	}
 
-	hr = transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, nullptr);
+	hr = transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
 
 	return true;
 }
@@ -233,7 +233,7 @@ bool mf_video_decoder::configure_output_type() {
 	hr = transform_->SetOutputType(kStream_id, output_type.Get(), 0);
 	if(FAILED(hr)) return false;
 
-	hr = transform_->GetOutputType(kStream_id, &output_type_);
+	hr = transform_->GetOutputAvailableType(kStream_id, 0, &output_type_);
 	if(FAILED(hr)) return false;
 
 	UINT32 width = 0, height = 0;
@@ -368,7 +368,7 @@ bool mf_video_decoder::decode(const uint8_t *nal_data, size_t nal_size,
 
 	if(!stream_started_) {
 		HRESULT hr = transform_->ProcessMessage(
-		    MFT_MESSAGE_NOTIFY_START_OF_STREAM, nullptr);
+		    MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
 		if(FAILED(hr)) {
 			return false;
 		}

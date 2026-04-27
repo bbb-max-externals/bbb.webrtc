@@ -272,7 +272,7 @@ bool mf_video_encoder::init(int width, int height, int bitrate_bps, int fps) {
 		}
 	}
 
-	hr = transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, nullptr);
+	hr = transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
 	// Non-fatal on some implementations.
 
 	return true;
@@ -372,7 +372,7 @@ bool mf_video_encoder::configure_output_type() {
 	hr = transform_->SetOutputType(kStream_id, output_type.Get(), 0);
 	if(FAILED(hr)) return false;
 
-	hr = transform_->GetOutputType(kStream_id, &output_type_);
+	hr = transform_->GetOutputAvailableType(kStream_id, 0, &output_type_);
 	if(FAILED(hr)) return false;
 
 	extract_sps_pps_from_sequence_header(output_type_.Get(), sps_pps_);
@@ -452,7 +452,7 @@ bool mf_video_encoder::encode(const uint8_t *rgba_data, int stride,
 
 		if(hr == MF_E_TRANSFORM_STREAM_CHANGE) {
 			ComPtr<IMFMediaType> new_output_type;
-			hr = transform_->GetOutputType(kStream_id, &new_output_type);
+			hr = transform_->GetOutputAvailableType(kStream_id, 0, &new_output_type);
 			if(SUCCEEDED(hr)) {
 				output_type_ = new_output_type;
 				sps_pps_.clear();
@@ -528,7 +528,7 @@ void mf_video_encoder::drain_encoder() {
 		return;
 	}
 
-	transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, nullptr);
+	transform_->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0);
 
 	MFT_OUTPUT_DATA_BUFFER output_buffer{};
 	output_buffer.dwStreamID = kStream_id;
