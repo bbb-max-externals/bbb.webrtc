@@ -2,6 +2,7 @@
 
 #include <rtc/rtc.hpp>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -92,6 +93,7 @@ private:
 	int decode_buffer_frames_{0};
 
 	mutable std::mutex mutex_;
+	std::atomic<bool> shutting_down_{false};
 };
 
 } // namespace webrtc

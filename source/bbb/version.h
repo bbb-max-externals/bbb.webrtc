@@ -1,2 +1,2 @@
 #pragma once
-#define BBB_WEBRTC_VERSION "0.0.3"
+#define BBB_WEBRTC_VERSION "0.0.7"

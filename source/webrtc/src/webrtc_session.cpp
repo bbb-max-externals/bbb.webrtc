@@ -42,6 +42,7 @@ void session::setup_peer_connection() {
 	pc_ = std::make_shared<rtc::PeerConnection>(rtc_config);
 
 	pc_->onStateChange([this](rtc::PeerConnection::State pc_state) {
+		if(shutting_down_.load()) return;
 		session::state s = session::state::disconnected;
 		switch(pc_state) {
 			case rtc::PeerConnection::State::New: s = session::state::disconnected; break;
@@ -61,18 +62,21 @@ void session::setup_peer_connection() {
 	});
 
 	pc_->onLocalDescription([this](const rtc::Description &desc) {
+		if(shutting_down_.load()) return;
 		if(sdp_callback_) {
 			sdp_callback_(desc.typeString(), std::string(desc));
 		}
 	});
 
 	pc_->onLocalCandidate([this](const rtc::Candidate &cand) {
+		if(shutting_down_.load()) return;
 		if(ice_callback_) {
 			ice_callback_(std::string(cand), cand.mid());
 		}
 	});
 
 	pc_->onTrack([this](rtc::shared_ptr<rtc::Track> track) {
+		if(shutting_down_.load()) return;
 		setup_track_callbacks(track);
 	});
 }
@@ -100,6 +104,7 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 	track->setMediaHandler(depacketizer);
 
 	track->onMessage([this](rtc::message_variant data) {
+		if(shutting_down_.load()) return;
 		if(!std::holds_alternative<rtc::binary>(data)) return;
 
 		const auto &bin = std::get<rtc::binary>(data);
@@ -197,16 +202,26 @@ session::state session::get_state() const {
 }
 
 void session::close() {
-	std::lock_guard<std::mutex> lock(mutex_);
-	if(audio_track_) {
-		audio_track_->close();
-		audio_track_.reset();
+	shutting_down_.store(true);
+
+	// Phase 1: Under lock — null callbacks and steal references
+	std::shared_ptr<rtc::PeerConnection> pc_local;
+	rtc::shared_ptr<rtc::Track> track_local;
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		state_callback_ = nullptr;
+		sdp_callback_ = nullptr;
+		ice_callback_ = nullptr;
+		audio_received_callback_ = nullptr;
+		track_local = std::move(audio_track_);
+		pc_local = std::move(pc_);
+		state_ = session::state::closed;
 	}
-	if(pc_) {
-		pc_->close();
-		pc_.reset();
-	}
-	state_ = session::state::closed;
+
+	// Phase 2: Close outside lock to avoid deadlock with network callbacks.
+	// Callbacks check shutting_down_ and return early.
+	if(track_local) track_local->close();
+	if(pc_local) pc_local->close();
 }
 
 }

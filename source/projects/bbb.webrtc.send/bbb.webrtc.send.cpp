@@ -97,7 +97,7 @@ public:
 		auto channel_count = static_cast<int>(input.channel_count());
 		auto frame_count = static_cast<int>(input.frame_count());
 
-		if(!m_session) return;
+		if(!m_connected.load(std::memory_order_acquire)) return;
 
 		for(int i = 0; i < frame_count; ++i) {
 			double sample = 0.0;
@@ -194,7 +194,7 @@ private:
 	}
 
 	void close() {
-		m_connected.store(false);
+		m_connected.store(false, std::memory_order_release);
 		if(m_session) {
 			m_session->close();
 			m_session.reset();

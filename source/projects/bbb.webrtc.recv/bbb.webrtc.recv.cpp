@@ -85,7 +85,7 @@ public:
 		auto frame_count = static_cast<int>(output.frame_count());
 		auto *out = output.samples(0);
 
-		if(!m_connected.load()) {
+		if(!m_connected.load(std::memory_order_acquire)) {
 			for(int i = 0; i < frame_count; ++i) {
 				out[i] = 0.0;
 			}
@@ -178,7 +178,7 @@ private:
 	}
 
 	void close() {
-		m_connected.store(false);
+		m_connected.store(false, std::memory_order_release);
 		if(m_session) {
 			m_session->close();
 			m_session.reset();
