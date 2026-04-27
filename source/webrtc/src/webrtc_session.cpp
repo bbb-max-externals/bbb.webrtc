@@ -4,9 +4,6 @@
 
 #include <rtc/rtc.hpp>
 
-#include <chrono>
-#include <cstring>
-#include <iostream>
 #include <mutex>
 
 namespace bbb {
@@ -52,10 +49,7 @@ void session::setup_peer_connection() {
 			case rtc::PeerConnection::State::Failed: s = session::state::failed; break;
 			case rtc::PeerConnection::State::Closed: s = session::state::closed; break;
 		}
-		{
-			std::lock_guard<std::mutex> lock(mutex_);
-			state_ = s;
-		}
+		state_.store(s);
 		if(state_callback_) {
 			state_callback_(s);
 		}
@@ -95,8 +89,6 @@ void session::add_audio_track() {
 	packetizer->addToChain(std::make_shared<rtc::RtcpReceivingSession>());
 	packetizer->addToChain(std::make_shared<rtc::RtcpSrReporter>(rtp_config));
 	audio_track_->setMediaHandler(packetizer);
-
-	setup_track_callbacks(audio_track_);
 }
 
 void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
@@ -132,14 +124,12 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 }
 
 void session::create_offer() {
-	std::lock_guard<std::mutex> lock(mutex_);
 	if(!pc_) setup_peer_connection();
 	add_audio_track();
 	pc_->setLocalDescription();
 }
 
 void session::set_remote_description(const std::string &type, const std::string &sdp) {
-	std::lock_guard<std::mutex> lock(mutex_);
 	if(!pc_) setup_peer_connection();
 
 	rtc::Description desc(sdp, type);
@@ -152,7 +142,6 @@ void session::set_remote_description(const std::string &type, const std::string 
 }
 
 void session::add_ice_candidate(const std::string &candidate, const std::string &mid) {
-	std::lock_guard<std::mutex> lock(mutex_);
 	if(!pc_) return;
 
 	rtc::Candidate cand(candidate, mid);
@@ -197,8 +186,7 @@ void session::on_audio_received(std::function<void(const float *data, int frame_
 }
 
 session::state session::get_state() const {
-	std::lock_guard<std::mutex> lock(mutex_);
-	return state_;
+	return state_.load();
 }
 
 void session::close() {

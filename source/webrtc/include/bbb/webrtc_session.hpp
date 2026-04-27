@@ -72,7 +72,7 @@ private:
 	void setup_track_callbacks(rtc::shared_ptr<rtc::Track> track);
 
 	session_config config_;
-	state state_{state::disconnected};
+	std::atomic<state> state_{state::disconnected};
 
 	std::shared_ptr<rtc::PeerConnection> pc_;
 	rtc::shared_ptr<rtc::Track> audio_track_;
@@ -86,11 +86,6 @@ private:
 	struct opus_decoder;
 	std::unique_ptr<opus_encoder> encoder_;
 	std::unique_ptr<opus_decoder> decoder_;
-
-	// audio buffering for receive path
-	std::vector<float> decode_buffer_;
-	int decode_buffer_pos_{0};
-	int decode_buffer_frames_{0};
 
 	mutable std::mutex mutex_;
 	std::atomic<bool> shutting_down_{false};
