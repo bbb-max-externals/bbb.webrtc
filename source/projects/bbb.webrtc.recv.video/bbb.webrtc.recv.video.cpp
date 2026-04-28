@@ -82,7 +82,18 @@ public:
 	cell<matrix_type, plane_count> calc_cell(cell<matrix_type, plane_count> input,
 	                                         const matrix_info &info, matrix_coord &position) {
 		if constexpr (plane_count == 4) {
-			if(!m_has_frame.load(std::memory_order_acquire)) {
+			// position(0,0) is called once per matrix calc — swap buffers here
+			if(position.x() == 0 && position.y() == 0) {
+				m_has_cached_frame = m_has_frame.exchange(false, std::memory_order_acq_rel);
+				if(m_has_cached_frame) {
+					std::lock_guard<std::mutex> lock(m_frame_mutex);
+					m_cached_width = m_frame_width;
+					m_cached_height = m_frame_height;
+					m_read_buffer = m_frame_buffer;
+				}
+			}
+
+			if(!m_has_cached_frame) {
 				return {static_cast<matrix_type>(0), static_cast<matrix_type>(0),
 				        static_cast<matrix_type>(0), static_cast<matrix_type>(255)};
 			}
@@ -90,19 +101,17 @@ public:
 			long x = position.x();
 			long y = position.y();
 
-			std::lock_guard<std::mutex> lock(m_frame_mutex);
-
-			if(x >= m_frame_width || y >= m_frame_height) {
+			if(x >= m_cached_width || y >= m_cached_height) {
 				return {static_cast<matrix_type>(0), static_cast<matrix_type>(0),
 				        static_cast<matrix_type>(0), static_cast<matrix_type>(255)};
 			}
 
-			std::size_t offset = static_cast<std::size_t>(y * m_frame_width + x) * 4;
+			std::size_t offset = static_cast<std::size_t>(y * m_cached_width + x) * 4;
 			return {
-				static_cast<matrix_type>(m_frame_buffer[offset + 0]),
-				static_cast<matrix_type>(m_frame_buffer[offset + 1]),
-				static_cast<matrix_type>(m_frame_buffer[offset + 2]),
-				static_cast<matrix_type>(m_frame_buffer[offset + 3])
+				static_cast<matrix_type>(m_read_buffer[offset + 0]),
+				static_cast<matrix_type>(m_read_buffer[offset + 1]),
+				static_cast<matrix_type>(m_read_buffer[offset + 2]),
+				static_cast<matrix_type>(m_read_buffer[offset + 3])
 			};
 		} else {
 			return input;
@@ -112,8 +121,12 @@ public:
 private:
 	std::unique_ptr<bbb::webrtc::video_session> m_session;
 	std::vector<uint8_t> m_frame_buffer;
-	int m_frame_width{0};
-	int m_frame_height{0};
+	std::vector<uint8_t> m_read_buffer;
+	long m_frame_width{0};
+	long m_frame_height{0};
+	long m_cached_width{0};
+	long m_cached_height{0};
+	bool m_has_cached_frame{false};
 	std::atomic<bool> m_has_frame{false};
 	std::atomic<bool> m_connected{false};
 	std::mutex m_frame_mutex;

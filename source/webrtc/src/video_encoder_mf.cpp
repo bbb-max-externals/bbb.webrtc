@@ -372,7 +372,7 @@ bool mf_video_encoder::configure_output_type() {
 	hr = transform_->SetOutputType(kStream_id, output_type.Get(), 0);
 	if(FAILED(hr)) return false;
 
-	hr = transform_->GetOutputAvailableType(kStream_id, 0, &output_type_);
+	hr = transform_->GetOutputCurrentType(kStream_id, &output_type_);
 	if(FAILED(hr)) return false;
 
 	extract_sps_pps_from_sequence_header(output_type_.Get(), sps_pps_);

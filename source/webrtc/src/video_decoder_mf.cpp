@@ -233,7 +233,7 @@ bool mf_video_decoder::configure_output_type() {
 	hr = transform_->SetOutputType(kStream_id, output_type.Get(), 0);
 	if(FAILED(hr)) return false;
 
-	hr = transform_->GetOutputAvailableType(kStream_id, 0, &output_type_);
+	hr = transform_->GetOutputCurrentType(kStream_id, &output_type_);
 	if(FAILED(hr)) return false;
 
 	UINT32 width = 0, height = 0;

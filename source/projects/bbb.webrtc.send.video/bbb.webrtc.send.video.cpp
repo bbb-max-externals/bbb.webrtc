@@ -163,16 +163,22 @@ private:
 	}
 
 	void capture_frame(const matrix_info &info) {
-		int w = static_cast<int>(info.width());
-		int h = static_cast<int>(info.height());
-		int stride = w * 4;
+		long w = static_cast<long>(info.width());
+		long h = static_cast<long>(info.height());
 
-		if(w != static_cast<int>(width) || h != static_cast<int>(height)) {
+		if(w != static_cast<long>(width) || h != static_cast<long>(height)) {
 			return;
 		}
 
-		m_frame_buffer.resize(static_cast<std::size_t>(stride * h));
-		std::memcpy(m_frame_buffer.data(), info.m_bip, static_cast<std::size_t>(stride * h));
+		long row_bytes = w * info.m_in_info->planecount;
+		m_frame_buffer.resize(static_cast<std::size_t>(row_bytes * h));
+		auto src = info.m_bip;
+		auto dst = m_frame_buffer.data();
+		for(long y = 0; y < h; ++y) {
+			std::memcpy(dst + static_cast<std::size_t>(y) * row_bytes,
+			            src + static_cast<std::size_t>(y) * info.m_in_info->dimstride[1],
+			            static_cast<std::size_t>(row_bytes));
+		}
 		m_frame_captured.store(true);
 	}
 
