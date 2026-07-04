@@ -1,10 +1,12 @@
-name: Build
+name: Build & Package
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  release:
+    types: [published]
 
 jobs:
   build-macos:
@@ -52,9 +54,14 @@ jobs:
           cmake -B build \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_BUILD_TYPE=Release \
             -DOPENSSL_ROOT_DIR=/tmp/openssl-universal \
-            -DOPENSSL_USE_STATIC_LIBS=ON
+            -DOPENSSL_USE_STATIC_LIBS=ON \
+            -DBBB_WEBRTC_BUILD_TESTS=ON
           cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
       - name: Verify Universal Binary
         run: |
@@ -104,11 +111,92 @@ jobs:
           cmake -B build -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
             -DOPENSSL_ROOT_DIR=C:\openssl `
-            -DOPENSSL_USE_STATIC_LIBS=ON
+            -DOPENSSL_USE_STATIC_LIBS=ON `
+            -DBBB_WEBRTC_BUILD_TESTS=ON
           cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Upload externals
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.repository.name }}-windows
           path: externals/
+
+  package:
+    permissions:
+      contents: write
+    needs: [build-macos, build-windows]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS externals
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-macos
+          path: dist/${{ github.event.repository.name }}/externals/
+
+      - name: Download Windows externals
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-windows
+          path: dist/${{ github.event.repository.name }}/externals/
+
+      - name: Assemble package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="dist/${{ github.event.repository.name }}"
+          mkdir -p "$PKG"
+          for file in package-info.json README.md LICENSE; do
+            if [ -f "$file" ]; then
+              cp "$file" "$PKG/"
+            fi
+          done
+          for dir in help extra extras patchers patches docs schemas examples media; do
+            if [ -d "$dir" ]; then
+              cp -R "$dir" "$PKG/"
+            fi
+          done
+          if [ -d "$PKG/externals" ]; then
+            find "$PKG/externals" -path '*/Contents/MacOS/*' -type f -exec chmod 755 {} +
+          fi
+
+      - name: Create macOS-preserving archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          ditto -c -k --keepParent "${{ github.event.repository.name }}" "${{ github.event.repository.name }}.zip"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-latest
+          path: dist/${{ github.event.repository.name }}.zip
+
+      - name: Update latest package release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ZIP="dist/${{ github.event.repository.name }}.zip"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest "${GITHUB_SHA}"
+          git push origin refs/tags/latest --force
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --title "Latest package" --notes "Automatically updated from main at ${GITHUB_SHA}."
+            gh release upload latest "$ZIP" --clobber
+          else
+            gh release create latest "$ZIP" --title "Latest package" --notes "Automatically updated from main at ${GITHUB_SHA}." --latest
+          fi
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ github.event.repository.name }}.zip

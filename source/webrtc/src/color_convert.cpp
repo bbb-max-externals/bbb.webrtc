@@ -28,21 +28,24 @@ void rgba_to_nv12(const uint8_t *rgba, int width, int height, int stride,
 	uint8_t *uv_plane = nv12_out.data() + width * height;
 	for(int y = 0; y < height / 2; ++y) {
 		for(int x = 0; x < width; x += 2) {
-			int r00 = rgba[(y * 2) * stride + (x * 2) * 4 + 0];
-			int g00 = rgba[(y * 2) * stride + (x * 2) * 4 + 1];
-			int b00 = rgba[(y * 2) * stride + (x * 2) * 4 + 2];
+			int source_y = y * 2;
+			int source_x = x;
 
-			int r01 = rgba[(y * 2) * stride + (x * 2 + 1) * 4 + 0];
-			int g01 = rgba[(y * 2) * stride + (x * 2 + 1) * 4 + 1];
-			int b01 = rgba[(y * 2) * stride + (x * 2 + 1) * 4 + 2];
+			int r00 = rgba[source_y * stride + source_x * 4 + 0];
+			int g00 = rgba[source_y * stride + source_x * 4 + 1];
+			int b00 = rgba[source_y * stride + source_x * 4 + 2];
 
-			int r10 = rgba[(y * 2 + 1) * stride + (x * 2) * 4 + 0];
-			int g10 = rgba[(y * 2 + 1) * stride + (x * 2) * 4 + 1];
-			int b10 = rgba[(y * 2 + 1) * stride + (x * 2) * 4 + 2];
+			int r01 = rgba[source_y * stride + (source_x + 1) * 4 + 0];
+			int g01 = rgba[source_y * stride + (source_x + 1) * 4 + 1];
+			int b01 = rgba[source_y * stride + (source_x + 1) * 4 + 2];
 
-			int r11 = rgba[(y * 2 + 1) * stride + (x * 2 + 1) * 4 + 0];
-			int g11 = rgba[(y * 2 + 1) * stride + (x * 2 + 1) * 4 + 1];
-			int b11 = rgba[(y * 2 + 1) * stride + (x * 2 + 1) * 4 + 2];
+			int r10 = rgba[(source_y + 1) * stride + source_x * 4 + 0];
+			int g10 = rgba[(source_y + 1) * stride + source_x * 4 + 1];
+			int b10 = rgba[(source_y + 1) * stride + source_x * 4 + 2];
+
+			int r11 = rgba[(source_y + 1) * stride + (source_x + 1) * 4 + 0];
+			int g11 = rgba[(source_y + 1) * stride + (source_x + 1) * 4 + 1];
+			int b11 = rgba[(source_y + 1) * stride + (source_x + 1) * 4 + 2];
 
 			int avg_r = (r00 + r01 + r10 + r11 + 2) / 4;
 			int avg_g = (g00 + g01 + g10 + g11 + 2) / 4;

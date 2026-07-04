@@ -3,6 +3,7 @@ project(bbb.webrtc VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(BBB_WEBRTC_BUILD_TESTS "Build bbb.webrtc core tests" OFF)
 
 # --- load bbb_add_external() ---
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/bbb_external.cmake)
@@ -71,5 +72,23 @@ foreach(project_dir ${PROJECT_DIRS})
 		add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source/projects/${project_dir})
 	endif()
 endforeach()
+
+if(BBB_WEBRTC_BUILD_TESTS)
+	enable_testing()
+	set(CMAKE_EXE_LINKER_FLAGS "")
+	foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+		set(CMAKE_EXE_LINKER_FLAGS_${config} "")
+	endforeach()
+	add_executable(bbb_webrtc_core_tests
+		tests/core_tests.cpp
+		source/webrtc/src/audio_ring_buffer.cpp
+		source/webrtc/src/color_convert.cpp
+	)
+	target_include_directories(bbb_webrtc_core_tests PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/source/webrtc/include
+	)
+	target_compile_features(bbb_webrtc_core_tests PRIVATE cxx_std_17)
+	add_test(NAME bbb_webrtc_core_tests COMMAND bbb_webrtc_core_tests)
+endif()
 
 set(CMAKE_SUPPRESS_REGENERATION true)
