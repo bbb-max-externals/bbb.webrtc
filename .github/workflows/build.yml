@@ -91,7 +91,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\openssl
-          key: openssl-3.3.2-x64-windows-v1
+          key: openssl-3.3.2-x64-windows-noasm-v1
 
       - name: Build OpenSSL (x64)
         if: steps.cache-openssl.outputs.cache-hit != 'true'
@@ -99,7 +99,7 @@ jobs:
         run: |
           git clone https://github.com/openssl/openssl.git --branch openssl-3.3.2 --depth 1 C:\openssl-src
           cd /d C:\openssl-src
-          perl Configure VC-WIN64A no-shared no-tests --prefix=C:\openssl
+          perl Configure VC-WIN64A no-shared no-tests no-asm --prefix=C:\openssl
           REM Match /MT (static CRT) used by min-api and our CMake config
           powershell -Command "(Get-Content makefile -Raw).Replace('/MDd','/MTd').Replace('/MD ','/MT ') | Set-Content makefile -NoNewline"
           nmake
