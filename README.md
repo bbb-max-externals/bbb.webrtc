@@ -96,7 +96,7 @@ Typical flow:
 ## Build
 
 ```bash
-git clone --recursive https://github.com/2bbb/bbb.webrtc.git
+git clone --recursive https://github.com/bbb-max-externals/bbb.webrtc.git
 cd bbb.webrtc
 cmake -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build build
