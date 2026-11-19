@@ -89,6 +89,11 @@ if(BBB_WEBRTC_BUILD_TESTS)
 	)
 	target_compile_features(bbb_webrtc_core_tests PRIVATE cxx_std_17)
 	add_test(NAME bbb_webrtc_core_tests COMMAND bbb_webrtc_core_tests)
+
+	add_executable(bbb_webrtc_audio_rate_tests tests/audio_rate_tests.cpp source/webrtc/src/opus_codec.cpp)
+	target_include_directories(bbb_webrtc_audio_rate_tests PRIVATE source/webrtc/include)
+	target_link_libraries(bbb_webrtc_audio_rate_tests PRIVATE Opus::opus)
+	add_test(NAME bbb_webrtc_audio_rate_tests COMMAND bbb_webrtc_audio_rate_tests)
 endif()
 
 set(CMAKE_SUPPRESS_REGENERATION true)

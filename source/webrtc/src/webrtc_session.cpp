@@ -17,6 +17,8 @@ struct session::opus_encoder {
 
 struct session::opus_decoder {
 	bbb::webrtc::opus_decoder dec;
+	std::mutex mutex;
+	std::function<void(const float*, int, int)> callback;
 	explicit opus_decoder(const session_config &cfg)
 		: dec(cfg.opus_sample_rate, cfg.opus_channels, cfg.opus_frame_size) {}
 };
@@ -24,7 +26,7 @@ struct session::opus_decoder {
 session::session(const session_config &config)
 	: config_(config)
 	, encoder_(std::make_unique<opus_encoder>(config))
-	, decoder_(std::make_unique<opus_decoder>(config)) {}
+	, decoder_(std::make_shared<opus_decoder>(config)) {}
 
 session::~session() {
 	close();
@@ -84,10 +86,10 @@ void session::add_audio_track() {
 
 	audio_track_ = pc_->addTrack(audio);
 
-	auto rtp_config = std::make_shared<rtc::RtpPacketizationConfig>(1, "audio-send", 111, rtc::OpusRtpPacketizer::DefaultClockRate);
-	auto packetizer = std::make_shared<rtc::OpusRtpPacketizer>(rtp_config);
+	audio_rtp_ = std::make_shared<rtc::RtpPacketizationConfig>(1, "audio-send", 111, rtc::OpusRtpPacketizer::DefaultClockRate);
+	auto packetizer = std::make_shared<rtc::OpusRtpPacketizer>(audio_rtp_);
 	packetizer->addToChain(std::make_shared<rtc::RtcpReceivingSession>());
-	packetizer->addToChain(std::make_shared<rtc::RtcpSrReporter>(rtp_config));
+	packetizer->addToChain(std::make_shared<rtc::RtcpSrReporter>(audio_rtp_));
 	audio_track_->setMediaHandler(packetizer);
 }
 
@@ -95,30 +97,31 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 	auto depacketizer = std::make_shared<rtc::OpusRtpDepacketizer>();
 	track->setMediaHandler(depacketizer);
 
-	track->onMessage([this](rtc::message_variant data) {
-		if(shutting_down_.load()) return;
+	track->onMessage([decoder = decoder_, max_frames = config_.opus_frame_size,
+	                  channels = config_.opus_channels](rtc::message_variant data) {
+		std::lock_guard<std::mutex> lock(decoder->mutex);
+		if (!decoder->callback) return;
 		if(!std::holds_alternative<rtc::binary>(data)) return;
 
 		const auto &bin = std::get<rtc::binary>(data);
 		if(bin.empty()) return;
 
-		const int max_frames = config_.opus_frame_size;
-		std::vector<float> pcm(max_frames * config_.opus_channels);
+		std::vector<float> pcm(max_frames * channels);
 
 		std::vector<std::uint8_t> raw_bytes(bin.size());
 		for(std::size_t i = 0; i < bin.size(); ++i) {
 			raw_bytes[i] = static_cast<std::uint8_t>(bin[i]);
 		}
 
-		int decoded = decoder_->dec.decode(
+		int decoded = decoder->dec.decode(
 			raw_bytes.data(),
 			static_cast<int>(raw_bytes.size()),
 			pcm.data(),
 			max_frames
 		);
 
-		if(decoded > 0 && audio_received_callback_) {
-			audio_received_callback_(pcm.data(), decoded, config_.opus_channels);
+		if(decoded > 0) {
+			decoder->callback(pcm.data(), decoded, channels);
 		}
 	});
 }
@@ -162,6 +165,7 @@ void session::send_audio(const float *samples, int frame_count, int channels) {
 			data[i] = static_cast<std::byte>(output[i]);
 		}
 		audio_track_->send(data);
+		audio_rtp_->timestamp += frame_count * rtc::OpusRtpPacketizer::DefaultClockRate / config_.opus_sample_rate;
 	}
 }
 
@@ -182,7 +186,8 @@ void session::on_local_ice_candidate(ice_callback callback) {
 }
 
 void session::on_audio_received(std::function<void(const float *data, int frame_count, int channels)> callback) {
-	audio_received_callback_ = std::move(callback);
+	std::lock_guard<std::mutex> lock(decoder_->mutex);
+	decoder_->callback = std::move(callback);
 }
 
 session::state session::get_state() const {
@@ -191,6 +196,7 @@ session::state session::get_state() const {
 
 void session::close() {
 	shutting_down_.store(true);
+	on_audio_received(nullptr);
 
 	// Phase 1: Under lock — null callbacks and steal references
 	std::shared_ptr<rtc::PeerConnection> pc_local;
@@ -200,7 +206,6 @@ void session::close() {
 		state_callback_ = nullptr;
 		sdp_callback_ = nullptr;
 		ice_callback_ = nullptr;
-		audio_received_callback_ = nullptr;
 		track_local = std::move(audio_track_);
 		pc_local = std::move(pc_);
 		state_ = session::state::closed;
