@@ -79,17 +79,6 @@ if(BBB_WEBRTC_BUILD_TESTS)
 	foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
 		set(CMAKE_EXE_LINKER_FLAGS_${config} "")
 	endforeach()
-	add_executable(bbb_webrtc_core_tests
-		tests/core_tests.cpp
-		source/webrtc/src/audio_ring_buffer.cpp
-		source/webrtc/src/color_convert.cpp
-	)
-	target_include_directories(bbb_webrtc_core_tests PRIVATE
-		${CMAKE_CURRENT_SOURCE_DIR}/source/webrtc/include
-	)
-	target_compile_features(bbb_webrtc_core_tests PRIVATE cxx_std_17)
-	add_test(NAME bbb_webrtc_core_tests COMMAND bbb_webrtc_core_tests)
-
 	add_executable(bbb_webrtc_audio_rate_tests tests/audio_rate_tests.cpp source/webrtc/src/opus_codec.cpp)
 	target_include_directories(bbb_webrtc_audio_rate_tests PRIVATE source/webrtc/include)
 	target_link_libraries(bbb_webrtc_audio_rate_tests PRIVATE Opus::opus)
@@ -100,6 +89,17 @@ if(BBB_WEBRTC_BUILD_TESTS)
 				$<TARGET_FILE:Opus::opus> $<TARGET_FILE_DIR:bbb_webrtc_audio_rate_tests>)
 	endif()
 	add_test(NAME bbb_webrtc_audio_rate_tests COMMAND bbb_webrtc_audio_rate_tests)
+
+	add_executable(bbb_webrtc_core_tests
+		tests/core_tests.cpp
+		source/webrtc/src/audio_ring_buffer.cpp
+		source/webrtc/src/color_convert.cpp
+	)
+	target_include_directories(bbb_webrtc_core_tests PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/source/webrtc/include
+	)
+	target_compile_features(bbb_webrtc_core_tests PRIVATE cxx_std_17)
+	add_test(NAME bbb_webrtc_core_tests COMMAND bbb_webrtc_core_tests)
 endif()
 
 set(CMAKE_SUPPRESS_REGENERATION true)
