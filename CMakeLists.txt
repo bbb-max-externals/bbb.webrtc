@@ -93,6 +93,12 @@ if(BBB_WEBRTC_BUILD_TESTS)
 	add_executable(bbb_webrtc_audio_rate_tests tests/audio_rate_tests.cpp source/webrtc/src/opus_codec.cpp)
 	target_include_directories(bbb_webrtc_audio_rate_tests PRIVATE source/webrtc/include)
 	target_link_libraries(bbb_webrtc_audio_rate_tests PRIVATE Opus::opus)
+	get_target_property(opus_type Opus::opus TYPE)
+	if(WIN32 AND opus_type STREQUAL "SHARED_LIBRARY")
+		add_custom_command(TARGET bbb_webrtc_audio_rate_tests POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				$<TARGET_FILE:Opus::opus> $<TARGET_FILE_DIR:bbb_webrtc_audio_rate_tests>)
+	endif()
 	add_test(NAME bbb_webrtc_audio_rate_tests COMMAND bbb_webrtc_audio_rate_tests)
 endif()
 
