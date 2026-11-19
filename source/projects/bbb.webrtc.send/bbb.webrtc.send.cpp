@@ -1,7 +1,11 @@
 #include "c74_min.h"
 #include "bbb/webrtc_session.hpp"
 #include "bbb/audio_ring_buffer.hpp"
+#include "bbb/audio_rate_converter.hpp"
 
+#include <array>
+#include <thread>
+#include <chrono>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -44,10 +48,6 @@ public:
 		range{6000, 510000}
 	};
 
-	bbb_webrtc_send(const atoms &args = {}) {
-		m_ring_buffer = std::make_unique<bbb::webrtc::audio_ring_buffer>(48000 * 2);
-		m_init_timer.delay(0);
-	}
 
 	~bbb_webrtc_send() {
 		close();
@@ -93,40 +93,64 @@ public:
 		}
 	};
 
-	void operator()(audio_bundle input, audio_bundle output) {
-		auto channel_count = static_cast<int>(input.channel_count());
-		auto frame_count = static_cast<int>(input.frame_count());
+	message<> dspsetup{this, "dspsetup", MIN_FUNCTION {
+		std::lock_guard<std::mutex> lock(m_dsp_lifecycle);
+		const double rate = args[0];
+		m_converter.setup(rate, 48000);
+		if (!m_storage) {
+			m_storage = std::make_unique<bbb::webrtc::audio_ring_buffer>(48000 * 2);
+			m_fifo.store(m_storage.get());
+		}
+		return {};
+	}};
 
-		if(!m_connected.load(std::memory_order_acquire)) return;
+	void operator()(audio_bundle input, audio_bundle) {
+		std::unique_lock<std::mutex> lock(m_dsp_lifecycle, std::try_to_lock);
+		if (!lock || !m_connected.load() || !m_storage || !input.channel_count()) return;
+		int index = 0;
+		auto read = [&](float& sample) {
+			if (index == input.frame_count()) return false;
+			double sum = 0;
+			for (int ch = 0; ch < input.channel_count(); ++ch) sum += input.samples(ch)[index];
+			sample = static_cast<float>(sum / input.channel_count());
+			++index;
+			return true;
+		};
+		float sample;
+		while (m_converter.next(read, sample)) m_storage->write(&sample, 1);
+	}
 
-		for(int i = 0; i < frame_count; ++i) {
-			double sample = 0.0;
-			for(int ch = 0; ch < channel_count; ++ch) {
-				sample += input.samples(ch)[i];
-			}
-			sample /= channel_count;
-			m_encode_buffer.push_back(static_cast<float>(sample));
+private:
+	std::thread m_sender;
+	std::atomic<bool> m_stop_sender{false};
 
-			if(static_cast<int>(m_encode_buffer.size()) >= m_frame_size) {
-				m_session->send_audio(m_encode_buffer.data(), m_frame_size, 1);
-				m_encode_buffer.clear();
+	void send_frames() {
+		std::array<float, 960> frame;
+		while (!m_stop_sender.load()) {
+			auto* fifo = m_fifo.load();
+			if (fifo && fifo->available_read() >= frame.size()) {
+				fifo->read(frame.data(), frame.size());
+				try {
+					m_session->send_audio(frame.data(), frame.size(), 1);
+				} catch (const std::exception& e) {
+					std::lock_guard<std::mutex> lock(m_pending_mutex);
+					m_pending_messages.push_back({"error", {e.what()}});
+					m_message_queue.set();
+					return;
+				}
+			} else {
+				std::this_thread::sleep_for(std::chrono::milliseconds(2));
 			}
 		}
 	}
 
-private:
-	static constexpr int m_frame_size = 960; // 20ms at 48kHz
-
 	std::unique_ptr<bbb::webrtc::session> m_session;
-	std::unique_ptr<bbb::webrtc::audio_ring_buffer> m_ring_buffer;
-	std::vector<float> m_encode_buffer;
+	std::unique_ptr<bbb::webrtc::audio_ring_buffer> m_storage;
+	// Published once at DSP setup; storage lives until the session is stopped.
+	std::atomic<bbb::webrtc::audio_ring_buffer*> m_fifo{nullptr};
+	std::mutex m_dsp_lifecycle;
+	bbb::webrtc::audio_rate_converter m_converter;
 	std::atomic<bool> m_connected{false};
-
-	timer<timer_options::defer_delivery> m_init_timer{this,
-		MIN_FUNCTION {
-			return {};
-		}
-	};
 
 	queue<> m_message_queue{this, MIN_FUNCTION {
 		deliver_pending_messages();
@@ -179,6 +203,8 @@ private:
 		});
 
 		m_session->create_offer();
+		m_stop_sender = false;
+		m_sender = std::thread([this] { send_frames(); });
 	}
 
 	void set_remote_answer(const std::string &sdp) {
@@ -195,11 +221,15 @@ private:
 
 	void close() {
 		m_connected.store(false, std::memory_order_release);
+		m_stop_sender = true;
+		if (m_sender.joinable()) m_sender.join();
 		if(m_session) {
 			m_session->close();
 			m_session.reset();
 		}
-		m_encode_buffer.clear();
+		std::lock_guard<std::mutex> lock(m_dsp_lifecycle);
+		if (m_storage) m_storage->reset();
+		m_converter.reset();
 	}
 
 	void deliver_pending_messages() {

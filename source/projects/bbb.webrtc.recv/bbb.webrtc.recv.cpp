@@ -1,6 +1,7 @@
 #include "c74_min.h"
 #include "bbb/webrtc_session.hpp"
 #include "bbb/audio_ring_buffer.hpp"
+#include "bbb/audio_rate_converter.hpp"
 
 #include <atomic>
 #include <memory>
@@ -39,10 +40,6 @@ public:
 		description{"TURN password"}
 	};
 
-	bbb_webrtc_recv(const atoms &args = {}) {
-		m_ring_buffer = std::make_unique<bbb::webrtc::audio_ring_buffer>(48000 * 2);
-		m_init_timer.delay(0);
-	}
 
 	~bbb_webrtc_recv() {
 		close();
@@ -76,44 +73,43 @@ public:
 			cout << "bbb.webrtc.recv status:" << endl;
 			cout << "  state: " << state_string() << endl;
 			cout << "  stun: " << to_string(stun_server) << endl;
-			cout << "  buffered: " << static_cast<int>(m_ring_buffer->available_read()) << " samples" << endl;
+			cout << "  buffered: " << (m_fifo.load() ? m_fifo.load()->available_read() : 0) << " samples" << endl;
 			return {};
 		}
 	};
 
-	void operator()(audio_bundle input, audio_bundle output) {
-		auto frame_count = static_cast<int>(output.frame_count());
-		auto *out = output.samples(0);
-
-		if(!m_connected.load(std::memory_order_acquire)) {
-			for(int i = 0; i < frame_count; ++i) {
-				out[i] = 0.0;
-			}
-			return;
+	message<> dspsetup{this, "dspsetup", MIN_FUNCTION {
+		std::lock_guard<std::mutex> lock(m_dsp_lifecycle);
+		const double rate = args[0];
+		m_converter.setup(48000, rate);
+		if (!m_storage) {
+			m_storage = std::make_unique<bbb::webrtc::audio_ring_buffer>(48000 * 2);
+			m_fifo.store(m_storage.get());
 		}
+		return {};
+	}};
 
-		std::vector<float> read_buf(frame_count);
-		auto read = m_ring_buffer->read(read_buf.data(), frame_count);
-
-		for(int i = 0; i < frame_count; ++i) {
-			if(i < static_cast<int>(read)) {
-				out[i] = static_cast<double>(read_buf[i]);
-			} else {
-				out[i] = 0.0;
-			}
+	void operator()(audio_bundle, audio_bundle output) {
+		auto* out = output.samples(0);
+		std::unique_lock<std::mutex> lock(m_dsp_lifecycle, std::try_to_lock);
+		int i = 0;
+		if (lock && m_connected.load() && m_storage) {
+			auto read = [&](float& sample) { return m_storage->read(&sample, 1) == 1; };
+			float sample;
+			while (i < output.frame_count() && m_converter.next(read, sample)) out[i++] = sample;
 		}
+		std::fill(out + i, out + output.frame_count(), 0.0);
 	}
 
 private:
-	std::unique_ptr<bbb::webrtc::session> m_session;
-	std::unique_ptr<bbb::webrtc::audio_ring_buffer> m_ring_buffer;
-	std::atomic<bool> m_connected{false};
 
-	timer<timer_options::defer_delivery> m_init_timer{this,
-		MIN_FUNCTION {
-			return {};
-		}
-	};
+	std::unique_ptr<bbb::webrtc::session> m_session;
+	std::unique_ptr<bbb::webrtc::audio_ring_buffer> m_storage;
+	// Published once at DSP setup; storage lives until the session is stopped.
+	std::atomic<bbb::webrtc::audio_ring_buffer*> m_fifo{nullptr};
+	std::mutex m_dsp_lifecycle;
+	bbb::webrtc::audio_rate_converter m_converter;
+	std::atomic<bool> m_connected{false};
 
 	queue<> m_message_queue{this, MIN_FUNCTION {
 		deliver_pending_messages();
@@ -165,7 +161,7 @@ private:
 		});
 
 		m_session->on_audio_received([this](const float *data, int frame_count, int channels) {
-			m_ring_buffer->write(data, frame_count * channels);
+			if (auto* fifo = m_fifo.load()) fifo->write(data, frame_count * channels);
 		});
 
 		m_session->set_remote_description("offer", sdp);
@@ -183,7 +179,9 @@ private:
 			m_session->close();
 			m_session.reset();
 		}
-		m_ring_buffer->reset();
+		std::lock_guard<std::mutex> lock(m_dsp_lifecycle);
+		if (m_storage) m_storage->reset();
+		m_converter.reset();
 	}
 
 	void deliver_pending_messages() {

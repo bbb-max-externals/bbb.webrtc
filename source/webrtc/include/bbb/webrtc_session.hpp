@@ -51,7 +51,7 @@ public:
 	void set_remote_description(const std::string &type, const std::string &sdp);
 	void add_ice_candidate(const std::string &candidate, const std::string &mid);
 
-	// audio i/o (called from audio thread)
+	// Called by the sender worker, outside the Max DSP callback.
 	void send_audio(const float *samples, int frame_count, int channels);
 
 	// audio output (called from audio thread, reads from ring buffer)
@@ -68,7 +68,7 @@ public:
 
 private:
 	void setup_peer_connection();
-	void add_audio_track();
+	void add_audio_track(bool sending);
 	void setup_track_callbacks(rtc::shared_ptr<rtc::Track> track);
 
 	session_config config_;
@@ -76,16 +76,16 @@ private:
 
 	std::shared_ptr<rtc::PeerConnection> pc_;
 	rtc::shared_ptr<rtc::Track> audio_track_;
+	std::shared_ptr<rtc::RtpPacketizationConfig> audio_rtp_;
 
 	state_callback state_callback_;
 	sdp_callback sdp_callback_;
 	ice_callback ice_callback_;
-	std::function<void(const float *data, int frame_count, int channels)> audio_received_callback_;
 
 	struct opus_encoder;
 	struct opus_decoder;
 	std::unique_ptr<opus_encoder> encoder_;
-	std::unique_ptr<opus_decoder> decoder_;
+	std::shared_ptr<opus_decoder> decoder_;
 
 	mutable std::mutex mutex_;
 	std::atomic<bool> shutting_down_{false};
