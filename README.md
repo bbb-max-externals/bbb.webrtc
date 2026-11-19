@@ -50,7 +50,7 @@ ICE configuration helper. Outputs STUN/TURN settings that can be routed to send/
 
 ### bbb.webrtc.send.video
 
-Jitter MOP object. Captures RGBA matrix frames, H.264-encodes (hardware), and sends via WebRTC.
+Jitter MOP object. Captures RGBA matrix frames, H.264-encodes (VideoToolbox on macOS, synchronous Media Foundation software encoder on Windows), and sends via WebRTC.
 
 ```
 [jit.noise 640 480 4] → [bbb.webrtc.send.video @width 640 @height 480 @bitrate 2000000]
