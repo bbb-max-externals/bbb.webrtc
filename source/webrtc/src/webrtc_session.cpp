@@ -77,14 +77,18 @@ void session::setup_peer_connection() {
 	});
 }
 
-void session::add_audio_track() {
+void session::add_audio_track(bool sending) {
 	if(!pc_) return;
 
-	rtc::Description::Audio audio("audio", rtc::Description::Direction::SendRecv);
+	rtc::Description::Audio audio("audio", sending ? rtc::Description::Direction::SendOnly : rtc::Description::Direction::RecvOnly);
 	audio.addOpusCodec(111);
-	audio.addSSRC(1, "audio-send");
+	if (sending) audio.addSSRC(1, "audio-send");
 
 	audio_track_ = pc_->addTrack(audio);
+	if (!sending) {
+		setup_track_callbacks(audio_track_);
+		return;
+	}
 
 	audio_rtp_ = std::make_shared<rtc::RtpPacketizationConfig>(1, "audio-send", 111, rtc::OpusRtpPacketizer::DefaultClockRate);
 	auto packetizer = std::make_shared<rtc::OpusRtpPacketizer>(audio_rtp_);
@@ -97,13 +101,10 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 	auto depacketizer = std::make_shared<rtc::OpusRtpDepacketizer>();
 	track->setMediaHandler(depacketizer);
 
-	track->onMessage([decoder = decoder_, max_frames = config_.opus_frame_size,
-	                  channels = config_.opus_channels](rtc::message_variant data) {
+	track->onFrame([decoder = decoder_, max_frames = config_.opus_frame_size,
+	                  channels = config_.opus_channels](rtc::binary bin, rtc::FrameInfo) {
 		std::lock_guard<std::mutex> lock(decoder->mutex);
 		if (!decoder->callback) return;
-		if(!std::holds_alternative<rtc::binary>(data)) return;
-
-		const auto &bin = std::get<rtc::binary>(data);
 		if(bin.empty()) return;
 
 		std::vector<float> pcm(max_frames * channels);
@@ -128,7 +129,7 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 
 void session::create_offer() {
 	if(!pc_) setup_peer_connection();
-	add_audio_track();
+	add_audio_track(true);
 	pc_->setLocalDescription();
 }
 
@@ -138,7 +139,7 @@ void session::set_remote_description(const std::string &type, const std::string 
 	rtc::Description desc(sdp, type);
 
 	if(type == "offer" && !audio_track_) {
-		add_audio_track();
+		add_audio_track(false);
 	}
 
 	pc_->setRemoteDescription(desc);

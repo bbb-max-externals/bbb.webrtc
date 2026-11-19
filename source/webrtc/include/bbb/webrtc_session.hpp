@@ -68,7 +68,7 @@ public:
 
 private:
 	void setup_peer_connection();
-	void add_audio_track();
+	void add_audio_track(bool sending);
 	void setup_track_callbacks(rtc::shared_ptr<rtc::Track> track);
 
 	session_config config_;
