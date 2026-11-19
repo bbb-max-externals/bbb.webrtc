@@ -36,7 +36,27 @@ bool check_tone(const std::vector<float>& samples, int rate) {
 	return std::abs(crossings * 2 - 440) <= 2;
 }
 
+bool check_packet_durations() {
+	for (int channels : {1, 2}) {
+		opus_encoder encoder(48000, channels, 64000, 960);
+		opus_decoder decoder(48000, channels, 960);
+		std::vector<float> input(5760 * channels, 0.1f);
+		std::vector<float> pcm(decoder.max_packet_frames() * channels);
+		std::array<uint8_t, 4000> packet{};
+		for (int frames : {960, 1920, 2880, 5760}) {
+			int bytes = encoder.encode(input.data(), frames, packet.data(), packet.size());
+			if (bytes <= 0 || decoder.decode(packet.data(), bytes, pcm.data(), decoder.max_packet_frames()) != frames)
+				return false;
+		}
+	}
+	return true;
+}
+
 int main() {
+	if (!check_packet_durations()) {
+		std::cerr << "Failed to decode a supported Opus packet duration\n";
+		return 1;
+	}
 	for (int input_rate : {44100, 48000, 88200, 96000}) {
 		std::vector<float> input(input_rate);
 		for (int i = 0; i < input_rate; ++i)

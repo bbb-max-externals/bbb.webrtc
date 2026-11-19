@@ -40,6 +40,8 @@ public:
 	// returns number of decoded frames, or -1 on error
 	int decode(const std::uint8_t *data, int size, float *pcm, int max_frames);
 
+	int max_packet_frames() const;
+
 	int get_frame_size() const { return frame_size_; }
 
 private:
