@@ -17,10 +17,12 @@ struct session::opus_encoder {
 
 struct session::opus_decoder {
 	bbb::webrtc::opus_decoder dec;
+	std::vector<float> pcm;
 	std::mutex mutex;
 	std::function<void(const float*, int, int)> callback;
 	explicit opus_decoder(const session_config &cfg)
-		: dec(cfg.opus_sample_rate, cfg.opus_channels, cfg.opus_frame_size) {}
+		: dec(cfg.opus_sample_rate, cfg.opus_channels, cfg.opus_frame_size),
+		  pcm(dec.max_packet_frames() * cfg.opus_channels) {}
 };
 
 session::session(const session_config &config)
@@ -101,28 +103,21 @@ void session::setup_track_callbacks(rtc::shared_ptr<rtc::Track> track) {
 	auto depacketizer = std::make_shared<rtc::OpusRtpDepacketizer>();
 	track->setMediaHandler(depacketizer);
 
-	track->onFrame([decoder = decoder_, max_frames = config_.opus_frame_size,
+	track->onFrame([decoder = decoder_,
 	                  channels = config_.opus_channels](rtc::binary bin, rtc::FrameInfo) {
 		std::lock_guard<std::mutex> lock(decoder->mutex);
 		if (!decoder->callback) return;
 		if(bin.empty()) return;
 
-		std::vector<float> pcm(max_frames * channels);
-
-		std::vector<std::uint8_t> raw_bytes(bin.size());
-		for(std::size_t i = 0; i < bin.size(); ++i) {
-			raw_bytes[i] = static_cast<std::uint8_t>(bin[i]);
-		}
-
 		int decoded = decoder->dec.decode(
-			raw_bytes.data(),
-			static_cast<int>(raw_bytes.size()),
-			pcm.data(),
-			max_frames
+			reinterpret_cast<const std::uint8_t*>(bin.data()),
+			static_cast<int>(bin.size()),
+			decoder->pcm.data(),
+			decoder->dec.max_packet_frames()
 		);
 
 		if(decoded > 0) {
-			decoder->callback(pcm.data(), decoded, channels);
+			decoder->callback(decoder->pcm.data(), decoded, channels);
 		}
 	});
 }

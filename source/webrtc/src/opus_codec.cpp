@@ -83,6 +83,11 @@ opus_decoder::opus_decoder(int sample_rate, int channels, int frame_size)
 
 opus_decoder::~opus_decoder() = default;
 
+int opus_decoder::max_packet_frames() const {
+	// RFC 6716 limits a whole packet to 120 ms, independently of sender settings.
+	return impl_->sample_rate * 120 / 1000;
+}
+
 int opus_decoder::decode(const std::uint8_t *data, int size, float *pcm, int max_frames) {
 	return opus_decode_float(impl_->dec, data, size, pcm, max_frames, 0);
 }
